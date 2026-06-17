@@ -70,6 +70,12 @@ button:disabled {
   opacity: 0.72;
 }
 
+button:focus-visible,
+.upload-button:focus-within {
+  outline: 3px solid color-mix(in srgb, var(--primary) 45%, transparent);
+  outline-offset: 2px;
+}
+
 input,
 select {
   min-width: 0;
@@ -179,6 +185,32 @@ select {
   border-radius: 12px;
   padding: 12px;
   font-weight: 750;
+}
+
+.connection-banner {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 11px 12px;
+  color: var(--muted);
+  background: var(--surface-2);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.connection-banner--online {
+  color: var(--good);
+  border-color: color-mix(in srgb, var(--good) 36%, var(--border));
+  background: color-mix(in srgb, var(--good) 10%, var(--surface));
+}
+
+.connection-banner--offline {
+  color: var(--bad);
+  border-color: color-mix(in srgb, var(--bad) 36%, var(--border));
+  background: color-mix(in srgb, var(--bad) 10%, var(--surface));
 }
 
 .primary-button,
@@ -449,6 +481,10 @@ select {
   gap: 14px;
 }
 
+.metric-card > div {
+  min-width: 0;
+}
+
 .metric-card span {
   color: var(--muted);
   display: block;
@@ -461,7 +497,7 @@ select {
   margin-top: 7px;
   display: block;
   color: var(--text);
-  font-size: 23px;
+  font-size: clamp(18px, 2vw, 23px);
   word-break: break-word;
 }
 
@@ -955,7 +991,7 @@ select {
 }
 
 .data-footprint {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   margin-top: 18px;
   margin-bottom: 0;
 }
@@ -1225,98 +1261,6 @@ select {
   }
 }
 
-@media (max-width: 1180px) {
-  .app-shell {
-    grid-template-columns: 1fr;
-  }
-
-  .sidebar {
-    position: static;
-    height: auto;
-  }
-
-  .nav-list {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .sidebar-actions {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .split-layout,
-  .page-grid,
-  .reports-layout,
-  .settings-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .metric-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 760px) {
-  .content {
-    padding: 18px;
-  }
-
-  .topbar,
-  .chart-block,
-  .row-card,
-  .report-hero {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .topbar-actions {
-    flex-wrap: wrap;
-  }
-
-  .filter-toolbar,
-  .metric-grid,
-  .voucher-grid,
-  .card-grid,
-  .nav-list,
-  .sidebar-actions,
-  .mini-metrics,
-  .data-footprint {
-    grid-template-columns: 1fr;
-  }
-
-  .date-custom-row,
-  .inline-fields,
-  .settings-field-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .panel-title .compact-input {
-    flex-basis: 100%;
-    width: 100%;
-  }
-
-  .notifications-panel {
-    top: calc(100% + 10px);
-    left: 0;
-    right: 0;
-    width: auto;
-    max-height: min(70vh, 540px);
-  }
-
-  .toast {
-    left: 16px;
-    right: 16px;
-    border-radius: 14px;
-  }
-
-  .row-card aside {
-    text-align: left;
-  }
-
-  .button-row {
-    flex-direction: column;
-  }
-}
-
 .month-hero {
   display: flex;
   align-items: center;
@@ -1351,31 +1295,6 @@ select {
   font-weight: 850;
 }
 
-@media (max-width: 760px) {
-  .month-hero {
-    align-items: stretch;
-    flex-direction: column;
-  }
-}
-
-button:focus-visible,
-.upload-button:focus-within {
-  outline: 3px solid color-mix(in srgb, var(--primary) 45%, transparent);
-  outline-offset: 2px;
-}
-
-.metric-card > div {
-  min-width: 0;
-}
-
-.metric-card strong {
-  font-size: clamp(18px, 2vw, 23px);
-}
-
-.data-footprint {
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-}
-
 @media (max-width: 1320px) {
   .split-layout {
     grid-template-columns: 1fr;
@@ -1383,6 +1302,15 @@ button:focus-visible,
 }
 
 @media (max-width: 1180px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: static;
+    height: auto;
+  }
+
   .nav-list {
     display: flex;
     overflow-x: auto;
@@ -1393,16 +1321,64 @@ button:focus-visible,
   .nav-list button {
     flex: 0 0 auto;
   }
+
+  .sidebar-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .page-grid,
+  .reports-layout,
+  .settings-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 760px) {
+  .content {
+    padding: 18px;
+  }
+
+  .topbar,
+  .chart-block,
+  .row-card,
+  .report-hero {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
   .topbar h1 {
     font-size: clamp(26px, 9vw, 34px);
   }
 
   .topbar-actions {
+    flex-wrap: wrap;
     width: 100%;
     justify-content: space-between;
+  }
+
+  .filter-toolbar,
+  .metric-grid,
+  .voucher-grid,
+  .card-grid,
+  .sidebar-actions,
+  .mini-metrics,
+  .data-footprint {
+    grid-template-columns: 1fr;
+  }
+
+  .date-custom-row,
+  .inline-fields,
+  .settings-field-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .panel-title .compact-input {
+    flex-basis: 100%;
+    width: 100%;
   }
 
   .date-preset-row {
@@ -1420,35 +1396,29 @@ button:focus-visible,
     width: 40px;
   }
 
+  .month-hero {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
   .notifications-panel {
     position: fixed;
     inset: auto 12px 12px;
+    width: auto;
     max-height: min(78vh, 560px);
   }
-}
 
-.connection-banner {
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 11px 12px;
-  color: var(--muted);
-  background: var(--surface-2);
-  font-size: 13px;
-  font-weight: 800;
-  line-height: 1.35;
-}
+  .toast {
+    left: 16px;
+    right: 16px;
+    border-radius: 14px;
+  }
 
-.connection-banner--online {
-  color: var(--good);
-  border-color: color-mix(in srgb, var(--good) 36%, var(--border));
-  background: color-mix(in srgb, var(--good) 10%, var(--surface));
-}
+  .row-card aside {
+    text-align: left;
+  }
 
-.connection-banner--offline {
-  color: var(--bad);
-  border-color: color-mix(in srgb, var(--bad) 36%, var(--border));
-  background: color-mix(in srgb, var(--bad) 10%, var(--surface));
+  .button-row {
+    flex-direction: column;
+  }
 }
