@@ -64,6 +64,7 @@ import {
   makeId,
   normalizeFinanceData,
   parseNumber,
+  processDueAutomations,
   resolveDateRange,
   todayIso,
   toMonthKey
@@ -386,6 +387,7 @@ function Dashboard({ user, onLogout }: DashboardProps) {
   const [toast, setToast] = useState<ToastState | null>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [budgetMonth, setBudgetMonth] = useState(currentMonthKey());
+  const [overviewMonth, setOverviewMonth] = useState(currentMonthKey());
   const [transactionQuery, setTransactionQuery] = useState("");
   const [transactionDateFilter, setTransactionDateFilter] = useState<DateFilterState>({
     preset: "currentMonth",
@@ -444,19 +446,25 @@ function Dashboard({ user, onLogout }: DashboardProps) {
     autoPost: false
   });
 
-  const summary = useMemo(() => calculateSummary(data, budgetMonth), [data, budgetMonth]);
+  const summary = useMemo(() => calculateSummary(data, overviewMonth), [data, overviewMonth]);
+  const budgetSummary = useMemo(() => calculateSummary(data, budgetMonth), [data, budgetMonth]);
   const expensesByCategory = useMemo(
-    () => groupByAmount(data.transactions.filter((item) => item.type === "expense"), "category", "amount"),
-    [data.transactions]
+    () =>
+      groupByAmount(
+        data.transactions.filter((item) => item.type === "expense" && toMonthKey(item.date) === overviewMonth),
+        "category",
+        "amount"
+      ),
+    [data.transactions, overviewMonth]
   );
   const currentExpensesByCategory = useMemo(
     () =>
       groupByAmount(
-        data.transactions.filter((item) => item.type === "expense" && toMonthKey(item.date) === budgetMonth),
+        data.transactions.filter((item) => item.type === "expense" && toMonthKey(item.date) === overviewMonth),
         "category",
         "amount"
       ),
-    [data.transactions, budgetMonth]
+    [data.transactions, overviewMonth]
   );
   const investmentsByType = useMemo(() => groupByAmount(data.investments, "type", "amount"), [data.investments]);
   const investmentReturnsByMonth = useMemo(
@@ -487,8 +495,11 @@ function Dashboard({ user, onLogout }: DashboardProps) {
     apiService.loadData(user.username).then((result) => {
       if (!mounted) return;
       if (result.status === "success" && result.data) {
-        const normalized = normalizeFinanceData(result.data);
+        const normalized = evaluateAlerts(processDueAutomations(normalizeFinanceData(result.data)));
         setData(normalized);
+        if (JSON.stringify(normalized) !== JSON.stringify(result.data)) {
+          void apiService.saveData(user.username, normalized);
+        }
         setTransactionDateFilter((current) => ({
           ...current,
           preset: normalized.settings.defaultDatePreset || "currentMonth"
@@ -1171,6 +1182,8 @@ function Dashboard({ user, onLogout }: DashboardProps) {
           <DashboardView
             data={data}
             summary={summary}
+            month={overviewMonth}
+            setMonth={setOverviewMonth}
             expensesByCategory={expensesByCategory}
             investmentsByType={investmentsByType}
             privacyMode={privacyMode}
@@ -1210,7 +1223,7 @@ function Dashboard({ user, onLogout }: DashboardProps) {
             form={budgetForm}
             month={budgetMonth}
             privacyMode={privacyMode}
-            summary={summary}
+            summary={budgetSummary}
             onCancel={resetBudgetForm}
             onDelete={deleteBudget}
             onEdit={editBudget}
@@ -1303,8 +1316,8 @@ function Dashboard({ user, onLogout }: DashboardProps) {
             expensesByCategory={expensesByCategory}
             currentExpensesByCategory={currentExpensesByCategory}
             privacyMode={privacyMode}
-            month={budgetMonth}
-            setMonth={setBudgetMonth}
+            month={overviewMonth}
+            setMonth={setOverviewMonth}
           />
         ) : null}
 
@@ -1432,6 +1445,8 @@ function NotificationsPanel({
 function DashboardView({
   data,
   summary,
+  month,
+  setMonth,
   expensesByCategory,
   investmentsByType,
   privacyMode,
@@ -1440,12 +1455,20 @@ function DashboardView({
 }: {
   data: FinanceData;
   summary: FinancialSummary;
+  month: string;
+  setMonth: (value: string) => void;
   expensesByCategory: Array<{ label: string; value: number }>;
   investmentsByType: Array<{ label: string; value: number }>;
   privacyMode: boolean;
   onEditGoal: (goal: Goal) => void;
   onSelectView: (view: View) => void;
 }) {
+  const monthTransactions = data.transactions.filter((item) => toMonthKey(item.date) === month);
+  const previousMonthDate = new Date(`${month}-02T00:00:00`);
+  previousMonthDate.setMonth(previousMonthDate.getMonth() - 1);
+  const previousMonth = previousMonthDate.toISOString().slice(0, 7);
+  const previousSummary = calculateSummary(data, previousMonth);
+  const balanceDelta = summary.balance - previousSummary.balance;
   const upcoming = data.recurrences
     .filter((item) => item.active)
     .sort((a, b) => a.nextDate.localeCompare(b.nextDate))
@@ -1453,11 +1476,24 @@ function DashboardView({
 
   return (
     <div className="page-grid">
+      <section className="month-hero panel panel--wide">
+        <div>
+          <span>Competencia mensal</span>
+          <h2>{month}</h2>
+          <p>Ao virar o mes, os novos lancamentos entram em uma nova competencia. Use o seletor para voltar ao historico de qualquer mes.</p>
+        </div>
+        <label>
+          Ver mes
+          <input className="compact-input" value={month} onChange={(event) => setMonth(event.target.value)} type="month" />
+        </label>
+      </section>
+
       <div className="metric-grid">
         <MetricCard label="Entradas" value={summary.income} icon={TrendingUp} tone="good" privacyMode={privacyMode} />
         <MetricCard label="Saidas" value={summary.expense} icon={TrendingDown} tone="bad" privacyMode={privacyMode} />
         <MetricCard label="Saldo livre" value={summary.balance} icon={WalletCards} tone="blue" privacyMode={privacyMode} />
         <MetricCard label="Patrimonio estimado" value={summary.netWorth} icon={PiggyBank} tone="warm" privacyMode={privacyMode} />
+        <MetricCard label="Variacao vs mes anterior" value={balanceDelta} icon={BarChart3} tone={balanceDelta >= 0 ? "good" : "bad"} privacyMode={privacyMode} />
       </div>
 
       <section className="panel">
@@ -1483,9 +1519,9 @@ function DashboardView({
             Ver todos
           </button>
         </div>
-        {data.transactions.length ? (
+        {monthTransactions.length ? (
           <div className="simple-list">
-            {data.transactions.slice(0, 7).map((item) => (
+            {monthTransactions.slice(0, 7).map((item) => (
               <div key={item.id}>
                 <span className={cx("dot", item.type === "income" ? "dot--good" : "dot--bad")} />
                 <p>{item.description}</p>
@@ -1495,7 +1531,7 @@ function DashboardView({
             ))}
           </div>
         ) : (
-          <EmptyState title="Nenhum lancamento ainda." action="Cadastre entradas e saidas para gerar a visao geral." />
+          <EmptyState title="Nenhum lancamento ainda." action="Cadastre entradas e saidas deste mes para gerar a visao geral." />
         )}
       </section>
 
