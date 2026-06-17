@@ -31,7 +31,7 @@ import {
   X
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { apiService, hasRemoteBackend } from "./services/api";
+import { apiService } from "./services/api";
 import type {
   Budget,
   DatePreset,
@@ -302,11 +302,39 @@ function AuthScreen({ onLogin }: AuthScreenProps) {
   const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [connectionStatus, setConnectionStatus] = useState<"checking" | "online" | "offline">("checking");
+  const [connectionMessage, setConnectionMessage] = useState("Verificando conexao com o Apps Script...");
+
+  useEffect(() => {
+    let mounted = true;
+    apiService.checkConnection().then((result) => {
+      if (!mounted) return;
+      if (result.status === "success") {
+        setConnectionStatus("online");
+        setConnectionMessage("Apps Script conectado e pronto para uso.");
+        return;
+      }
+      setConnectionStatus("offline");
+      setConnectionMessage(result.message || "Apps Script offline ou nao configurado.");
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setLoading(true);
     setError("");
+
+    const connection = await apiService.checkConnection();
+    if (connection.status !== "success") {
+      setLoading(false);
+      setConnectionStatus("offline");
+      setConnectionMessage(connection.message || "Apps Script offline ou nao configurado.");
+      setError("Conecte o Apps Script para entrar ou criar conta.");
+      return;
+    }
 
     const result = isRegister
       ? await apiService.register(username.trim(), email.trim(), password)
@@ -334,8 +362,13 @@ function AuthScreen({ onLogin }: AuthScreenProps) {
         </div>
 
         <form className="form-stack" onSubmit={handleSubmit}>
+          <div className={cx("connection-banner", `connection-banner--${connectionStatus}`)}>
+            {connectionStatus === "checking" ? <LoaderCircle className="spin" size={16} /> : connectionStatus === "online" ? <Cloud size={16} /> : <CloudOff size={16} />}
+            <span>{connectionMessage}</span>
+          </div>
+
           <label>
-            Usuario ou e-mail
+            {isRegister ? "Usuario" : "Usuario ou e-mail"}
             <input value={username} onChange={(event) => setUsername(event.target.value)} required autoComplete="username" />
           </label>
 
@@ -367,7 +400,7 @@ function AuthScreen({ onLogin }: AuthScreenProps) {
 
           <button className="primary-button" disabled={loading} type="submit">
             {loading ? <LoaderCircle className="spin" size={18} /> : null}
-            {isRegister ? "Criar conta" : "Entrar"}
+            {isRegister ? "Criar conta no Apps Script" : "Entrar"}
           </button>
         </form>
 
@@ -504,7 +537,7 @@ function Dashboard({ user, onLogout }: DashboardProps) {
           ...current,
           preset: normalized.settings.defaultDatePreset || "currentMonth"
         }));
-        setSyncStatus(result.source === "remote" ? "online" : "local");
+        setSyncStatus("online");
       } else {
         setSyncStatus("error");
         showToast(result.message || "Nao foi possivel carregar os dados.", "error", false);
@@ -651,11 +684,11 @@ function Dashboard({ user, onLogout }: DashboardProps) {
     setSyncStatus("saving");
     const result = await apiService.saveData(user.username, withAlerts);
     if (result.status === "success") {
-      setSyncStatus(result.source === "remote" ? "online" : "local");
-      showToast(successMessage, result.source === "remote" ? "success" : "warning");
+      setSyncStatus("online");
+      showToast(successMessage, "success");
     } else {
       setSyncStatus("error");
-      showToast(result.message || "Dados salvos localmente, mas a nuvem falhou.", "warning");
+      showToast(result.message || "Nao foi possivel salvar no Apps Script.", "error");
     }
   };
 
@@ -1376,15 +1409,15 @@ function SyncBadge({ status }: { status: SyncStatus }) {
     return (
       <span className="sync-badge sync-badge--error">
         <CloudOff size={16} />
-        Nuvem indisponivel
+        Apps Script offline
       </span>
     );
   }
 
   return (
-    <span className="sync-badge sync-badge--local">
+    <span className="sync-badge sync-badge--offline">
       <CloudOff size={16} />
-      Modo local{hasRemoteBackend ? " / fallback" : ""}
+      Apps Script desconectado
     </span>
   );
 }
@@ -2605,7 +2638,7 @@ function ReportsView({
     <div className="reports-layout">
       <section className="report-hero">
         <div>
-          <span>Relatorio local</span>
+          <span>Relatorio mensal</span>
           <h2>{Math.round(healthScore)} pontos</h2>
           <p>Indicador gerado no navegador, sem consumir token ou chamar servico externo.</p>
         </div>
