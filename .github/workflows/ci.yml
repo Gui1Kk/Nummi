@@ -15,13 +15,12 @@ concurrency:
 jobs:
   quality:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
       - run: npm install --ignore-scripts --no-audit --no-fund
       - run: npm run lint
       - run: npm test
@@ -33,17 +32,17 @@ jobs:
 
   browser-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
       - run: npm install --ignore-scripts --no-audit --no-fund
-      - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e
+      - run: npm run build
         env:
           VITE_SUPABASE_URL: https://uqisolhdsvzjmdvohbki.supabase.co
           VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_jAg9zWHKrkK3X2FRXdhgFw_5-r48ScB
           VITE_API_URL: https://uqisolhdsvzjmdvohbki.supabase.co/functions/v1/api-v1/v1
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
