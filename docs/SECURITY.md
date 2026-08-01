@@ -1,35 +1,27 @@
 # Segurança
 
-## Controles aplicados
+## Camadas
 
-- Supabase Auth, sem autenticação própria;
-- RLS em todas as tabelas expostas;
-- políticas separadas por operação e propriedade `auth.uid() = user_id`;
-- `USING` e `WITH CHECK` em atualizações;
-- grants explícitos e privilégios padrão revogados;
-- schema `private` fora da Data API;
-- funções privilegiadas revogadas de `anon` e `authenticated`;
-- API com JWT, Zod estrito, body de 1 MB, paginação limitada e rate limiting;
-- respostas genéricas sem stack trace;
-- CSP e cabeçalhos de segurança na Vercel;
-- proteção contra CSV Formula Injection;
-- idempotência em criação/importação;
-- trilha de auditoria para registros financeiros.
+1. Supabase Auth com PKCE, confirmação e recuperação por e-mail.
+2. JWT obrigatório no gateway da Edge Function.
+3. validação Zod estrita e limites de recurso.
+4. filtro explícito por usuário na API.
+5. RLS e constraints no PostgreSQL.
+6. relações compostas `(user_id, id)` para impedir referências cruzadas.
+7. auditoria em schema privado sem grants para clientes.
 
-## Segredos
+## Conta
 
-Somente `VITE_SUPABASE_PUBLISHABLE_KEY` pode ir ao navegador. `SUPABASE_SERVICE_ROLE_KEY` fica exclusivamente no ambiente da Edge Function. Não registrar JWTs, senhas, chaves ou conteúdo financeiro completo em logs.
+- cadastro exige confirmação de senha;
+- política local: 10+ caracteres, minúscula, maiúscula e número;
+- login diferencia e-mail não confirmado sem revelar dados adicionais;
+- recuperação sempre retorna mensagem genérica;
+- troca de senha autenticada exige `currentPassword`;
+- troca de e-mail exige confirmação;
+- sessões podem ser revogadas.
 
-## Testes obrigatórios
+## Pendências administrativas
 
-- usuário A não lê, altera ou remove registros do usuário B;
-- tentativa de trocar `user_id` falha;
-- ID inexistente e ID de outro usuário retornam resultado indistinguível;
-- payload com campo desconhecido falha;
-- lote, paginação e corpo acima do limite falham;
-- idempotência evita duplicação;
-- recorrências não criam duas ocorrências para a mesma data.
+O Security Advisor informa que **Leaked Password Protection** está desativado. Ative em Authentication > Password Security. Configure também CAPTCHA e SMTP próprio antes de abrir cadastros públicos. Essas configurações não podem ser aplicadas por SQL nem pelo conector disponível.
 
-## Relato de vulnerabilidade
-
-Não abra issue pública contendo dados pessoais, tokens ou prova explorável. Revogue credenciais comprometidas, preserve evidências e trate o incidente antes de divulgar detalhes.
+As tabelas `private.audit_log` e `private.api_rate_limits` ficam fora do schema exposto. Seus privilégios foram explicitamente revogados de `PUBLIC`, `anon` e `authenticated`; somente funções/backend privilegiados as utilizam.
