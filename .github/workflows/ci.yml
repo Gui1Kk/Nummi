@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -26,10 +27,37 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm install --ignore-scripts --no-audit --no-fund
+      - name: TypeScript diagnostics
+        id: typecheck
+        shell: bash
+        run: |
+          set +e
+          npx tsc --noEmit > tsc-output.txt 2>&1
+          status=$?
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Publish typecheck diagnostics
+        if: steps.typecheck.outputs.status != '0' && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const output = fs.readFileSync('tsc-output.txt', 'utf8').slice(0, 60000);
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `## TypeScript diagnostics\n\n\`\`\`text\n${output}\n\`\`\``
+            });
+      - name: Enforce typecheck
+        if: steps.typecheck.outputs.status != '0'
+        run: cat tsc-output.txt && exit 1
       - run: npm audit --audit-level=high
-      - run: npm run check
+      - run: npm run lint
+      - run: npm test
+      - run: npx vite build
+      - run: npm run check:bundle
       - run: npm run test:api-public
 
   browser-smoke:
@@ -40,8 +68,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm install --ignore-scripts --no-audit --no-fund
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
