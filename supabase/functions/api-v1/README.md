@@ -1,5 +1,18 @@
 # Edge Function `api-v1`
 
-A função está implantada no projeto Supabase `Nummi` com JWT obrigatório. A versão de produção implementa as rotas documentadas em `docs/API.md`, validação Zod estrita, limite de corpo, paginação, idempotência, rate limiting, CORS, cabeçalhos defensivos e respostas sem detalhes internos.
+Código-fonte da API financeira implantada no projeto Supabase `Nummi` com JWT obrigatório.
 
-O código implantado deve ser exportado pelo Supabase CLI antes da próxima alteração e mantido sincronizado com este repositório. Não use `service_role` no frontend.
+## Arquivos
+
+- `index.ts`: roteamento, autenticação, recursos e respostas;
+- `schemas.ts`: contratos Zod estritos;
+- `http.ts`: CORS, limites, paginação, erros e proteção CSV;
+- `deno.json`: configuração do runtime.
+
+A versão de produção exige `SUPABASE_URL`, chave publicável, `SUPABASE_SERVICE_ROLE_KEY` e opcionalmente `ALLOWED_ORIGINS`. A chave privilegiada nunca deve entrar no frontend.
+
+Implantação:
+
+```bash
+supabase functions deploy api-v1 --verify-jwt
+```
