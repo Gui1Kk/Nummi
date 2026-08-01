@@ -1,102 +1,23 @@
-import type { ApiResult, FinanceData } from "../types";
-import { normalizeFinanceData } from "../utils";
+import { appConfig } from "../lib/config";
+import { supabase } from "../lib/supabase";
 
-const scriptUrl = import.meta.env.VITE_GOOGLE_SCRIPT_URL?.trim() || "";
-const sessionTokenKey = (username: string) => `nummi:token:${username}`;
+interface ApiErrorShape { error?: { code?: string; message?: string; details?: unknown }; request_id?: string; }
+export class ApiError extends Error { constructor(message: string, public readonly status: number, public readonly code: string, public readonly requestId?: string, public readonly details?: unknown) { super(message); this.name = "ApiError"; } }
+function mergeSignals(signal?: AbortSignal) { const timeout = AbortSignal.timeout(20_000); return signal ? AbortSignal.any([signal, timeout]) : timeout; }
 
-const connectionError = <T = unknown>(message?: string): ApiResult<T> => ({
-  status: "error",
-  message: message || "Nao foi possivel conectar ao Google Apps Script. Verifique a URL /exec e o deploy.",
-  source: "remote"
-});
-
-const requestRemote = async <T>(payload: Record<string, unknown>): Promise<ApiResult<T>> => {
-  if (!scriptUrl) {
-    return connectionError<T>("Google Apps Script nao configurado. Defina VITE_GOOGLE_SCRIPT_URL com a URL /exec do deploy.");
-  }
-
-  try {
-    const response = await fetch(scriptUrl, {
-      method: "POST",
-      body: JSON.stringify(payload),
-      headers: { "Content-Type": "text/plain;charset=utf-8" }
-    });
-
-    const text = await response.text();
-    try {
-      return JSON.parse(text) as ApiResult<T>;
-    } catch {
-      return connectionError<T>("O Apps Script respondeu algo que nao e JSON. Verifique se o deploy publicado e a URL /exec estao corretos.");
-    }
-  } catch {
-    return connectionError<T>();
-  }
-};
-
-
-export const apiService = {
-  async checkConnection(): Promise<ApiResult<{ app?: string; version?: string; schemaVersion?: number }>> {
-    if (!scriptUrl) {
-      return connectionError<{ app?: string; version?: string; schemaVersion?: number }>("Google Apps Script nao configurado. Defina VITE_GOOGLE_SCRIPT_URL antes de usar o sistema.");
-    }
-
-    try {
-      const response = await fetch(scriptUrl, { method: "GET" });
-      const text = await response.text();
-      const parsed = JSON.parse(text) as ApiResult<{ app?: string; version?: string; schemaVersion?: number }>;
-      return parsed.status === "success" ? { ...parsed, source: "remote" } : connectionError<{ app?: string; version?: string; schemaVersion?: number }>(parsed.message);
-    } catch {
-      return connectionError<{ app?: string; version?: string; schemaVersion?: number }>("Apps Script offline ou inacessivel no momento.");
-    }
-  },
-
-  async login(identifier: string, password: string): Promise<ApiResult<unknown>> {
-    if (!identifier || !password) {
-      return { status: "error", message: "Informe usuario/e-mail e senha.", source: "remote" };
-    }
-
-    return requestRemote({ action: "login", username: identifier, password });
-  },
-
-  async register(username: string, email: string, password: string): Promise<ApiResult<unknown>> {
-    if (!username || !email || !password) {
-      return { status: "error", message: "Informe usuario, e-mail e senha.", source: "remote" };
-    }
-
-    return requestRemote({ action: "register", username, email, password });
-  },
-
-  async loadData(username: string): Promise<ApiResult<FinanceData>> {
-    const token = localStorage.getItem(sessionTokenKey(username)) || sessionStorage.getItem(sessionTokenKey(username)) || "";
-    const remote = await requestRemote<FinanceData>({
-      action: "load",
-      username,
-      token,
-      page: 1,
-      pageSize: 10000
-    });
-
-    if (remote.status === "success") {
-      return { status: "success", data: normalizeFinanceData(remote.data), source: "remote" };
-    }
-
-    return { ...remote, source: "remote" };
-  },
-
-  async saveData(username: string, data: FinanceData): Promise<ApiResult<FinanceData>> {
-    const normalized = normalizeFinanceData(data);
-    const token = localStorage.getItem(sessionTokenKey(username)) || sessionStorage.getItem(sessionTokenKey(username)) || "";
-    const remote = await requestRemote<FinanceData>({
-      action: "save_all",
-      username,
-      token,
-      data: normalized
-    });
-
-    if (remote.status === "success") {
-      return { status: "success", data: normalized, source: "remote" };
-    }
-
-    return { ...remote, data: normalized, source: "remote" };
-  }
-};
+export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const { data, error } = await supabase.auth.getSession();
+  if (error || !data.session?.access_token) throw new ApiError("Sua sessão expirou. Entre novamente.", 401, "UNAUTHORIZED");
+  const headers = new Headers(init.headers);
+  headers.set("Authorization", `Bearer ${data.session.access_token}`);
+  headers.set("Accept", "application/json");
+  if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  let response: Response;
+  try { response = await fetch(`${appConfig.apiUrl}${path}`, { ...init, headers, signal: mergeSignals(init.signal ?? undefined) }); }
+  catch (caught) { if (caught instanceof DOMException && caught.name === "TimeoutError") throw new ApiError("A API demorou demais para responder.", 408, "TIMEOUT"); throw new ApiError("Não foi possível conectar à API do Nummi.", 503, "NETWORK_ERROR"); }
+  if (response.status === 204) return undefined as T;
+  const contentType = response.headers.get("content-type") ?? "";
+  const payload = contentType.includes("application/json") ? await response.json() as ApiErrorShape & { data?: T } : null;
+  if (!response.ok) throw new ApiError(payload?.error?.message || "A API rejeitou a operação.", response.status, payload?.error?.code || "API_ERROR", payload?.request_id, payload?.error?.details);
+  return (payload?.data ?? payload) as T;
+}
