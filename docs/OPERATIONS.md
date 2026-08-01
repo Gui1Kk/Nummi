@@ -1,26 +1,22 @@
-# Operação e deploy
+# Operação
 
-## CI
+## Deploy
 
-Pull requests e `main` executam lint, testes e build. O deploy só deve avançar com os checks verdes.
+1. executar migrations em ordem;
+2. implantar `supabase/functions/api-v1` com `verify_jwt=true`;
+3. configurar `ALLOWED_ORIGINS` quando houver domínio definitivo;
+4. configurar Auth Site URL, redirects, SMTP, templates, CAPTCHA e leaked-password protection;
+5. publicar o frontend na Vercel;
+6. executar smoke de API, Playwright e advisors.
 
-## Vercel
+## Observabilidade
 
-Configure as três variáveis `VITE_*` descritas no README. O arquivo `vercel.json` aplica CSP e cabeçalhos defensivos.
+- use `X-Request-Id` para correlacionar erros;
+- revise logs de Auth, API, Postgres e Edge Function;
+- rode Security/Performance Advisors após DDL;
+- monitore falhas de e-mail e rate limits;
+- alerte quando snapshot se aproximar de 5.000 lançamentos por usuário.
 
-## Supabase
+## Rollback
 
-Após cada mudança de DDL:
-
-1. aplicar migration versionada;
-2. executar testes de RLS;
-3. rodar Security Advisor e Performance Advisor;
-4. gerar novamente os tipos TypeScript;
-5. revisar grants e funções `SECURITY DEFINER`.
-
-## Recuperação
-
-- migrations são a fonte do schema;
-- exportações de usuário devem ser testadas periodicamente;
-- alterações destrutivas exigem backup e plano de rollback;
-- incidentes exigem revogação de sessões/chaves e análise de logs.
+Frontend: reverter o commit/deploy Vercel. Edge Function: implantar a versão anterior. Banco: escrever migration corretiva; não editar migrations já aplicadas.
