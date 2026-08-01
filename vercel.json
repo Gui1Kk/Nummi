@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm run check",
+  "buildCommand": "bash scripts/vercel-quality-diagnostic.sh",
   "headers": [{
     "source": "/(.*)",
     "headers": [
