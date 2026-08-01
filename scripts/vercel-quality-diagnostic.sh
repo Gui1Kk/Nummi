@@ -15,10 +15,16 @@ set +e
   echo "== bundle budget =="
   npm run check:bundle
   echo "bundle_exit=$?"
+  echo "== playwright install =="
+  npx playwright install chromium
+  echo "playwright_install_exit=$?"
+  echo "== browser tests =="
+  CI=1 npm run test:e2e
+  echo "e2e_exit=$?"
 } > /tmp/nummi-quality/output.txt 2>&1
 set -e
 curl -sS -X POST "https://uqisolhdsvzjmdvohbki.supabase.co/functions/v1/build-diagnostics" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVxaXNvbGhkc3Z6am1kdm9oYmtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1MzcwNjIsImV4cCI6MjEwMTExMzA2Mn0.HQoMUkXdMlfAr8Q-xDac8tuO8GB88aCAblVoYVtmlDY" \
-  -H "x-build-source: vercel-quality-pr6" \
+  -H "x-build-source: vercel-browser-pr6" \
   --data-binary @/tmp/nummi-quality/output.txt >/dev/null || true
 npx vite build
