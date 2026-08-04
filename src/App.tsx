@@ -134,7 +134,7 @@ export default function App() {
     );
   }
 
-  if (!finance.session) return <AuthScreen />;
+  if (!finance.session) return <AuthScreen initialMessage={finance.error ?? ""} />;
 
   const privacy = finance.snapshot.settings?.privacy_mode ?? false;
   const money = (value: number) => privacy ? "R$ •••••" : formatCurrency(value);
