@@ -3,6 +3,7 @@ import type { Session } from "@supabase/supabase-js";
 import { financeService } from "../services/finance";
 import { supabase } from "../lib/supabase";
 import { monthEnd, monthStart, todayIso } from "../lib/format";
+import { monthSummary } from "../lib/money";
 import type { FinanceSnapshot, MonthSummary } from "../types";
 
 const emptySnapshot: FinanceSnapshot = {
@@ -123,31 +124,9 @@ export function useFinance() {
   const summaryForMonth = useCallback((month: string): MonthSummary => {
     const start = monthStart(month);
     const end = monthEnd(month);
-    const rows = snapshot.transactions.filter(
+    return monthSummary(snapshot.transactions.filter(
       (item) => item.transaction_date >= start && item.transaction_date <= end
-    );
-    const posted = rows.filter((item) => item.status === "posted");
-    const income = posted
-      .filter((item) => item.kind === "income")
-      .reduce((sum, item) => sum + item.amount, 0);
-    const expense = posted
-      .filter((item) => item.kind === "expense")
-      .reduce((sum, item) => sum + item.amount, 0);
-    const plannedIncome = rows
-      .filter((item) => item.status === "planned" && item.kind === "income")
-      .reduce((sum, item) => sum + item.amount, 0);
-    const plannedExpense = rows
-      .filter((item) => item.status === "planned" && item.kind === "expense")
-      .reduce((sum, item) => sum + item.amount, 0);
-
-    return {
-      income,
-      expense,
-      balance: income - expense,
-      plannedIncome,
-      plannedExpense,
-      savingsRate: income > 0 ? ((income - expense) / income) * 100 : 0
-    };
+    ));
   }, [snapshot.transactions]);
 
   const categoryById = useMemo(
