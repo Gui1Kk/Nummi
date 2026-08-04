@@ -18,8 +18,10 @@ Plataforma financeira pessoal para controlar **entradas, saídas, lançamentos p
 
 ## Desenvolvimento
 
+O repositório ainda não possui `package-lock.json`, portanto use `npm install` até que o lockfile seja gerado e revisado em um ambiente com acesso ao registro público.
+
 ```bash
-npm ci
+npm install --ignore-scripts --no-audit --no-fund
 cp .env.example .env.local
 npm run dev
 ```
@@ -34,14 +36,15 @@ A chave publicável pode estar no navegador. Nunca coloque `service_role`, secre
 
 ## Qualidade
 
+O deploy da Vercel executa `npm run check`, que combina lint, testes unitários, TypeScript, build de produção e orçamento de bundle.
+
 ```bash
-npm run lint
-npm test
-npm run build
-npm run check:bundle
-npm run test:e2e
+npm run check
 npm run test:api-public
+npm run test:e2e
 ```
+
+O GitHub Actions também contém esses gates e o Playwright, mas o executor da conta precisa estar operacional para iniciar os jobs.
 
 ## Documentação
 
@@ -55,7 +58,8 @@ npm run test:api-public
 - [Desempenho](docs/PERFORMANCE.md)
 - [Regras financeiras](docs/FINANCIAL_RULES.md)
 - [Operação](docs/OPERATIONS.md)
+- [Checklist de conclusão](docs/FINAL_COMPLETION_CHECKLIST.md)
 
 ## Configuração externa necessária
 
-O código de confirmação e recuperação está implementado. Para envio confiável a qualquer usuário, configure um SMTP de produção no painel Supabase, além de Site URL, redirects autorizados, CAPTCHA e proteção contra senhas vazadas. Essas opções exigem credenciais administrativas/provedor e não ficam no repositório.
+O código de confirmação e recuperação está implementado. Para envio confiável a qualquer usuário, configure um SMTP de produção no painel Supabase, além de Site URL, redirects autorizados, CAPTCHA e proteção contra senhas vazadas. Essas opções exigem credenciais administrativas e um provedor externo, portanto não ficam no repositório.
