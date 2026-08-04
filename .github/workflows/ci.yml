@@ -9,40 +9,73 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+env:
+  VITE_SUPABASE_URL: https://uqisolhdsvzjmdvohbki.supabase.co
+  VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_jAg9zWHKrkK3X2FRXdhgFw_5-r48ScB
+  VITE_API_URL: https://uqisolhdsvzjmdvohbki.supabase.co/functions/v1/api-v1/v1
+  PLAYWRIGHT_HTML_OPEN: never
 
 jobs:
   quality:
+    name: Lint, unit, typecheck, build and API
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node 22
+        uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install --ignore-scripts --no-audit --no-fund
-      - run: npm run lint
-      - run: npm test
-      - run: npm run build
-        env:
-          VITE_SUPABASE_URL: https://uqisolhdsvzjmdvohbki.supabase.co
-          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_jAg9zWHKrkK3X2FRXdhgFw_5-r48ScB
-          VITE_API_URL: https://uqisolhdsvzjmdvohbki.supabase.co/functions/v1/api-v1/v1
+
+      - name: Install dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Dependency audit
+        run: npm audit --audit-level=high
+
+      - name: Static and unit quality gate
+        run: npm run check
+
+      - name: Public API hostile smoke
+        run: npm run test:api-public
 
   browser-smoke:
+    name: Chromium desktop and mobile smoke
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node 22
+        uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install --ignore-scripts --no-audit --no-fund
-      - run: npm run build
-        env:
-          VITE_SUPABASE_URL: https://uqisolhdsvzjmdvohbki.supabase.co
-          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_jAg9zWHKrkK3X2FRXdhgFw_5-r48ScB
-          VITE_API_URL: https://uqisolhdsvzjmdvohbki.supabase.co/functions/v1/api-v1/v1
-      - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e
+
+      - name: Install dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Build application
+        run: npm run build
+
+      - name: Install Chromium and system dependencies
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser tests
+        run: npm run test:e2e
+
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-evidence-${{ github.run_attempt }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 14

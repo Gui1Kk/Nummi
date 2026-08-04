@@ -1,0 +1,136 @@
+import { z } from "npm:zod@4.4.3";
+import { MAX_BODY_BYTES, MAX_OFFSET, MAX_PAGE_SIZE } from "./schemas.ts";
+
+export type JsonObject = Record<string, unknown>;
+
+export class ApiError extends Error {
+  constructor(
+    public status: number,
+    public code: string,
+    message: string,
+    public details?: unknown
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
+const configuredOrigins = (Deno.env.get("ALLOWED_ORIGINS") ?? "")
+  .split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
+const configuredOriginSet = new Set(configuredOrigins);
+
+export function isAllowedOrigin(origin: string | null) {
+  if (!origin) return true;
+  if (configuredOriginSet.has(origin)) return true;
+
+  try {
+    const url = new URL(origin);
+    if (url.protocol === "http:" && ["localhost", "127.0.0.1"].includes(url.hostname)) return true;
+    return url.protocol === "https:"
+      && url.hostname.endsWith(".vercel.app")
+      && (url.hostname === "nummi.vercel.app" || url.hostname.startsWith("nummi-"));
+  } catch {
+    return false;
+  }
+}
+
+export function corsHeaders(req: Request): HeadersInit {
+  const origin = req.headers.get("origin");
+  if (!origin || !isAllowedOrigin(origin)) return {};
+
+  return {
+    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Headers": "authorization, content-type, idempotency-key, x-client-info",
+    "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS",
+    "Access-Control-Max-Age": "86400",
+    Vary: "Origin"
+  };
+}
+
+export function baseHeaders(req: Request, requestId: string): HeadersInit {
+  return {
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
+    "X-Request-Id": requestId,
+    ...corsHeaders(req)
+  };
+}
+
+export function json(req: Request, status: number, body: JsonObject, requestId: string) {
+  return new Response(JSON.stringify({ ...body, request_id: requestId }), {
+    status,
+    headers: baseHeaders(req, requestId)
+  });
+}
+
+export function fail(
+  req: Request,
+  status: number,
+  code: string,
+  message: string,
+  requestId: string,
+  details?: unknown
+) {
+  return json(req, status, {
+    error: { code, message, ...(details === undefined ? {} : { details }) }
+  }, requestId);
+}
+
+export function noContent(req: Request, requestId: string) {
+  const headers = new Headers(baseHeaders(req, requestId));
+  headers.delete("Content-Type");
+  return new Response(null, { status: 204, headers });
+}
+
+export async function readJson(req: Request) {
+  const declared = Number(req.headers.get("content-length") ?? "0");
+  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
+    throw new ApiError(413, "PAYLOAD_TOO_LARGE", "Payload exceeds 1 MB");
+  }
+
+  const text = await req.text();
+  if (new TextEncoder().encode(text).byteLength > MAX_BODY_BYTES) {
+    throw new ApiError(413, "PAYLOAD_TOO_LARGE", "Payload exceeds 1 MB");
+  }
+  if (!text) return {};
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new ApiError(400, "INVALID_JSON", "Request body is not valid JSON");
+  }
+}
+
+export function pathSegments(url: URL) {
+  const parts = url.pathname.split("/").filter(Boolean);
+  const index = parts.indexOf("api-v1");
+  return (index >= 0 ? parts.slice(index + 1) : parts).filter((part) => part !== "v1");
+}
+
+export function assertQueryKeys(url: URL, allowed: string[]) {
+  const unexpected = [...url.searchParams.keys()].filter((key) => !allowed.includes(key));
+  if (unexpected.length) {
+    throw new ApiError(400, "UNKNOWN_QUERY_PARAMETER", `Unsupported query parameter: ${unexpected[0]}`);
+  }
+}
+
+export function pagination(url: URL) {
+  return {
+    limit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(50)
+      .parse(url.searchParams.get("limit") ?? undefined),
+    offset: z.coerce.number().int().min(0).max(MAX_OFFSET).default(0)
+      .parse(url.searchParams.get("offset") ?? undefined)
+  };
+}
+
+export function csvCell(value: unknown) {
+  let text = value == null ? "" : String(value);
+  if (/^[=+\-@]/.test(text)) text = `'${text}`;
+  return `"${text.replaceAll('"', '""')}"`;
+}

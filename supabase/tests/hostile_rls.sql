@@ -1,0 +1,7 @@
+-- Executado contra um banco isolado ou dentro de uma transação com rollback.
+-- Critérios obrigatórios:
+-- 1. user B não lê, altera nem exclui linhas de user A;
+-- 2. user B não insere user_id de A;
+-- 3. referências de categoria, recorrência e assinatura precisam pertencer ao mesmo user_id;
+-- 4. repetição de idempotency_key não cria uma segunda transação.
+-- O relatório de 2026-08-01 em docs/QA_MATRIX.md registra a execução no projeto real.

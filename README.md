@@ -1,40 +1,30 @@
 # Nummi
 
-Plataforma financeira pessoal para registrar **entradas, saídas, orçamentos, recorrências e assinaturas**. O Nummi substitui controles dispersos em planilhas por um fluxo mensal simples, auditável e protegido por isolamento de dados no banco.
-
-> Patrimônio, carteira, investimentos e metas não fazem parte do escopo atual.
+Plataforma financeira pessoal para controlar **entradas, saídas, lançamentos previstos, recorrências, assinaturas e orçamentos mensais**. O produto não possui patrimônio, carteira, investimentos ou metas.
 
 ## Recursos
 
-- entradas e saídas realizadas ou planejadas;
-- categorias próprias;
-- recorrências diárias, semanais, mensais e anuais;
-- assinaturas mensais e anuais com próximo vencimento;
-- geração idempotente de ocorrências;
+- cadastro com confirmação de e-mail e senha forte;
+- reenvio de confirmação e recuperação de conta;
+- alteração autenticada de perfil, e-mail e senha;
+- encerramento de sessão local, remota ou global;
+- lançamentos realizados e previstos com edição, filtros e pesquisa;
+- recorrências e assinaturas editáveis, pausáveis e idempotentes;
 - orçamentos mensais por categoria;
-- relatórios por competência;
-- importação e exportação CSV com proteção contra fórmulas maliciosas;
-- autenticação pelo Supabase Auth;
-- Row Level Security em todas as tabelas privadas;
-- API REST versionada em Supabase Edge Functions.
-
-## Stack
-
-- React 18, TypeScript estrito e Vite;
-- Supabase Auth, PostgreSQL 17, RLS e Edge Functions;
-- Zod para validação na interface e na API;
-- Vitest e Playwright;
-- Vercel para frontend e GitHub Actions para CI.
+- relatório mensal e exportação CSV segura;
+- tema escuro neon como padrão e tema claro aurora;
+- modo de privacidade e densidade compacta;
+- Supabase Auth, PostgreSQL, RLS e Edge Function versionada.
 
 ## Desenvolvimento
 
+O repositório ainda não possui `package-lock.json`, portanto use `npm install` até que o lockfile seja gerado e revisado em um ambiente com acesso ao registro público.
+
 ```bash
-npm install
+npm install --ignore-scripts --no-audit --no-fund
 cp .env.example .env.local
 npm run dev
 ```
-
-Variáveis:
 
 ```env
 VITE_SUPABASE_URL=https://SEU_PROJETO.supabase.co
@@ -42,30 +32,34 @@ VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 VITE_API_URL=https://SEU_PROJETO.supabase.co/functions/v1/api-v1/v1
 ```
 
-A chave publicável pode existir no navegador. A segurança depende de RLS e grants. Nunca use `service_role` ou secret key no frontend.
+A chave publicável pode estar no navegador. Nunca coloque `service_role`, secret key ou credenciais SMTP no frontend.
 
-## Verificações
+## Qualidade
+
+O deploy da Vercel executa `npm run check`, que combina lint, testes unitários, TypeScript, build de produção e orçamento de bundle.
 
 ```bash
-npm run lint
-npm test
-npm run build
+npm run check
+npm run test:api-public
 npm run test:e2e
 ```
 
-## Banco e API
+O GitHub Actions também contém esses gates e o Playwright, mas o executor da conta precisa estar operacional para iniciar os jobs.
 
-Consulte:
+## Documentação
 
 - [Arquitetura](docs/ARCHITECTURE.md)
-- [Modelo financeiro](docs/FINANCIAL_RULES.md)
-- [Segurança](docs/SECURITY.md)
 - [API](docs/API.md)
-- [Migração do Apps Script](docs/MIGRATION.md)
-- [Operação e deploy](docs/OPERATIONS.md)
+- [OpenAPI](docs/openapi.yaml)
+- [Autenticação e e-mail](docs/AUTH_EMAIL_SETUP.md)
+- [Segurança](docs/SECURITY.md)
+- [Auditoria completa do legado](docs/LEGACY_AUDIT_COMPLETE.md)
+- [Matriz de QA](docs/QA_MATRIX.md)
+- [Desempenho](docs/PERFORMANCE.md)
+- [Regras financeiras](docs/FINANCIAL_RULES.md)
+- [Operação](docs/OPERATIONS.md)
+- [Checklist de conclusão](docs/FINAL_COMPLETION_CHECKLIST.md)
 
-As migrations ficam em `supabase/migrations`. A Edge Function está em `supabase/functions/api-v1`.
+## Configuração externa necessária
 
-## Estado de segurança
-
-O schema de produção foi verificado pelo Supabase Security Advisor sem alertas após a correção das funções privilegiadas. Isso não significa segurança absoluta: mudanças futuras exigem novamente testes de RLS, revisão de dependências, CI e análise dos advisors.
+O código de confirmação e recuperação está implementado. Para envio confiável a qualquer usuário, configure um SMTP de produção no painel Supabase, além de Site URL, redirects autorizados, CAPTCHA e proteção contra senhas vazadas. Essas opções exigem credenciais administrativas e um provedor externo, portanto não ficam no repositório.

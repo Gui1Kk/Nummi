@@ -1,52 +1,21 @@
-# API v1
+# Nummi API v1.2
 
-Base: `https://<project-ref>.supabase.co/functions/v1/api-v1/v1`
+Base: `https://uqisolhdsvzjmdvohbki.supabase.co/functions/v1/api-v1/v1`
 
-Todas as rotas exigem:
+Toda chamada exige `Authorization: Bearer <JWT Supabase>`. A Edge Function valida o JWT e o banco aplica RLS novamente. IDs pertencentes a outro usuário são tratados como não encontrados.
 
-```http
-Authorization: Bearer <access_token>
-Content-Type: application/json
-```
+## Controles
 
-## Rotas
+- Zod estrito em body, path e query;
+- parâmetros desconhecidos rejeitados;
+- payload máximo de 1 MB;
+- página máxima de 100 e offset máximo de 10.000;
+- importação máxima de 500 linhas;
+- exportação máxima de 10.000 linhas;
+- `Idempotency-Key` de 8 a 128 caracteres;
+- rate limit por usuário e rota;
+- origens permitidas limitadas ao Nummi/Vercel e desenvolvimento local;
+- CSV neutraliza células iniciadas por `=`, `+`, `-` e `@`;
+- erros possuem `request_id` e não expõem SQL/stack.
 
-| Método | Rota | Uso |
-|---|---|---|
-| GET | `/health` | estado da API autenticada |
-| GET | `/snapshot` | snapshot limitado para a interface |
-| GET/PATCH | `/profile` | perfil do usuário |
-| GET/PATCH | `/settings` | preferências |
-| GET/POST | `/transactions` | listar e criar lançamentos |
-| GET/PATCH/DELETE | `/transactions/:id` | operar um lançamento |
-| GET/POST | `/categories` | categorias |
-| GET/PATCH/DELETE | `/categories/:id` | categoria individual |
-| GET/POST | `/recurrences` | recorrências |
-| GET/PATCH/DELETE | `/recurrences/:id` | recorrência individual |
-| GET/POST | `/subscriptions` | assinaturas |
-| GET/PATCH/DELETE | `/subscriptions/:id` | assinatura individual |
-| GET/POST | `/budgets` | orçamentos |
-| GET/PATCH/DELETE | `/budgets/:id` | orçamento individual |
-| GET | `/summary?from=YYYY-MM-DD&to=YYYY-MM-DD` | resumo do período |
-| POST | `/automations/post-due` | processar vencimentos |
-| POST | `/import/transactions` | importar até 500 linhas JSON |
-| GET | `/export/transactions?format=json|csv` | exportar lançamentos |
-
-## Paginação
-
-`limit` entre 1 e 100; `offset` entre 0 e 10.000.
-
-## Idempotência
-
-Na criação de transações, envie `Idempotency-Key` com 8 a 128 caracteres. Repetir a mesma chave retorna o registro existente.
-
-## Erros
-
-```json
-{
-  "error": { "code": "VALIDATION_ERROR", "message": "Request validation failed" },
-  "request_id": "uuid"
-}
-```
-
-O `request_id` serve para correlação. A resposta não expõe SQL, stack trace ou detalhes internos.
+As rotas e schemas estão em [openapi.yaml](openapi.yaml). Os fluxos de e-mail são feitos diretamente pelo Supabase Auth SDK, não pela API financeira.

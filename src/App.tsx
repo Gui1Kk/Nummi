@@ -1,61 +1,277 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
-import { BarChart3, HelpCircle, LayoutDashboard, ListChecks, LogOut, Plus, RefreshCw, Repeat2, Settings, Trash2, WalletCards } from "lucide-react";
+import { Suspense, lazy, useEffect, useMemo, useState } from "react";
+import {
+  BarChart3,
+  HelpCircle,
+  LayoutDashboard,
+  ListChecks,
+  LogOut,
+  RefreshCw,
+  Repeat2,
+  Settings,
+  WalletCards
+} from "lucide-react";
+import { AuthScreen } from "./features/auth/AuthScreen";
+import { PasswordRecoveryScreen } from "./features/auth/PasswordRecoveryScreen";
+import { StatusMessage } from "./components/ui";
 import { useFinance } from "./hooks/useFinance";
-import { authService, financeService } from "./services/finance";
-import { budgetFormSchema, recurrenceFormSchema, subscriptionFormSchema, transactionFormSchema } from "./schemas";
-import { formatCurrency, formatDate, monthEnd, monthKey, monthLabel, monthStart, todayIso } from "./lib/format";
-import type { BudgetFormInput, RecurrenceFormInput, SubscriptionFormInput, TransactionFormInput } from "./schemas";
-import type { Category, ViewId } from "./types";
+import { authService } from "./services/finance";
+import { formatCurrency, monthEnd, monthKey, monthStart } from "./lib/format";
+import type { ViewId } from "./types";
+
+const DashboardView = lazy(() => import("./features/dashboard/DashboardView")
+  .then((module) => ({ default: module.DashboardView })));
+const TransactionsView = lazy(() => import("./features/transactions/TransactionsView")
+  .then((module) => ({ default: module.TransactionsView })));
+const AutomationsView = lazy(() => import("./features/automations/AutomationsView")
+  .then((module) => ({ default: module.AutomationsView })));
+const BudgetsView = lazy(() => import("./features/budgets/BudgetsView")
+  .then((module) => ({ default: module.BudgetsView })));
+const ReportsView = lazy(() => import("./features/reports/ReportsView")
+  .then((module) => ({ default: module.ReportsView })));
+const SettingsView = lazy(() => import("./features/settings/SettingsView")
+  .then((module) => ({ default: module.SettingsView })));
+const HelpView = lazy(() => import("./features/help/HelpView")
+  .then((module) => ({ default: module.HelpView })));
 
 const nav: Array<[ViewId, string, typeof LayoutDashboard]> = [
-  ["dashboard", "Visão geral", LayoutDashboard], ["transactions", "Lançamentos", WalletCards], ["automations", "Recorrências", Repeat2],
-  ["budgets", "Orçamentos", ListChecks], ["reports", "Relatórios", BarChart3], ["settings", "Ajustes", Settings], ["help", "Ajuda", HelpCircle]
+  ["dashboard", "Visão geral", LayoutDashboard],
+  ["transactions", "Lançamentos", WalletCards],
+  ["automations", "Recorrências", Repeat2],
+  ["budgets", "Orçamentos", ListChecks],
+  ["reports", "Relatórios", BarChart3],
+  ["settings", "Conta e ajustes", Settings],
+  ["help", "Ajuda", HelpCircle]
 ];
-const txBlank = (): TransactionFormInput => ({ description: "", amount: 0, kind: "expense", status: "posted", category_id: null, transaction_date: todayIso(), note: null });
-const recBlank = (): RecurrenceFormInput => ({ description: "", amount: 0, kind: "expense", category_id: null, frequency: "monthly", interval_count: 1, anchor_day: new Date().getDate(), start_date: todayIso(), next_date: todayIso(), end_date: null, auto_post: true, active: true, note: null });
-const subBlank = (): SubscriptionFormInput => ({ name: "", amount: 0, category_id: null, cycle: "monthly", interval_count: 1, billing_day: new Date().getDate(), start_date: todayIso(), next_charge: todayIso(), end_date: null, active: true, auto_post: true, reminder_days: 3, website: null, note: null });
-
-function Auth() {
-  const [register, setRegister] = useState(false); const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [name, setName] = useState(""); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
-  async function submit(event: FormEvent) { event.preventDefault(); setBusy(true); setError(""); try { if (password.length < 8) throw new Error("A senha deve ter pelo menos 8 caracteres."); if (register) await authService.signUp(email, password, name); else await authService.signIn(email, password); } catch (caught) { setError(caught instanceof Error ? caught.message : "Falha ao autenticar."); } finally { setBusy(false); } }
-  return <main className="auth"><section><div className="brand"><span>N</span><div><h1>Dinheiro claro, decisões melhores.</h1><p>Entradas, saídas, recorrências e assinaturas em um único lugar.</p></div></div><form onSubmit={submit}>{register && <label>Nome<input value={name} onChange={e => setName(e.target.value)} maxLength={80} required /></label>}<label>E-mail<input type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" required /></label><label>Senha<input type="password" value={password} onChange={e => setPassword(e.target.value)} minLength={8} autoComplete={register ? "new-password" : "current-password"} required /></label>{error && <p className="error" role="alert">{error}</p>}<button disabled={busy}>{busy ? "Processando…" : register ? "Criar conta" : "Entrar"}</button><button type="button" className="link" onClick={() => setRegister(v => !v)}>{register ? "Já tenho conta" : "Criar uma conta"}</button></form></section></main>;
-}
-
-function Card({ title, children }: { title: string; children: React.ReactNode }) { return <section className="card"><h2>{title}</h2>{children}</section>; }
-function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="field"><span>{label}</span>{children}</label>; }
 
 export default function App() {
-  const finance = useFinance(); const [view, setView] = useState<ViewId>("dashboard"); const [month, setMonth] = useState(monthKey()); const [message, setMessage] = useState(""); const [busy, setBusy] = useState(false);
-  const [tx, setTx] = useState(txBlank()); const [rec, setRec] = useState(recBlank()); const [sub, setSub] = useState(subBlank()); const [budget, setBudget] = useState<BudgetFormInput>({ category_id: "", month: `${month}-01`, amount: 0, rollover: false });
-  const summary = finance.summaryForMonth(month); const categoryMap = useMemo(() => new Map(finance.snapshot.categories.map(c => [c.id, c])), [finance.snapshot.categories]);
-  const monthRows = finance.snapshot.transactions.filter(t => t.transaction_date >= monthStart(month) && t.transaction_date <= monthEnd(month));
-  useEffect(() => { document.documentElement.dataset.theme = finance.snapshot.settings?.theme === "dark" ? "dark" : "light"; }, [finance.snapshot.settings?.theme]);
-  async function run(action: () => Promise<unknown>, ok: string) { setBusy(true); setMessage(""); try { await action(); await finance.refresh(false); setMessage(ok); } catch (caught) { setMessage(caught instanceof Error ? caught.message : "A operação falhou."); throw caught; } finally { setBusy(false); } }
-  if (finance.loading) return <main className="splash"><div>N</div><p>Carregando o Nummi…</p></main>;
-  if (!finance.session) return <Auth />;
-  const privacy = finance.snapshot.settings?.privacy_mode ?? false; const money = (value: number) => privacy ? "R$ •••••" : formatCurrency(value);
-  const categoriesFor = (kind: "income" | "expense") => finance.snapshot.categories.filter(c => !c.archived && (c.scope === "both" || c.scope === kind));
+  const finance = useFinance();
+  const [view, setView] = useState<ViewId>("dashboard");
+  const [month, setMonth] = useState(monthKey());
+  const [message, setMessage] = useState("");
+  const [tone, setTone] = useState<"info" | "success" | "warning" | "error">("info");
+  const [busy, setBusy] = useState(false);
 
-  async function saveTx(event: FormEvent) { event.preventDefault(); const parsed = transactionFormSchema.safeParse(tx); if (!parsed.success) return setMessage(parsed.error.issues[0]?.message ?? "Dados inválidos."); await run(() => financeService.saveTransaction(parsed.data), "Lançamento salvo."); setTx(txBlank()); }
-  async function saveRec(event: FormEvent) { event.preventDefault(); const parsed = recurrenceFormSchema.safeParse(rec); if (!parsed.success) return setMessage(parsed.error.issues[0]?.message ?? "Dados inválidos."); await run(() => financeService.saveRecurrence(parsed.data), "Recorrência salva."); setRec(recBlank()); }
-  async function saveSub(event: FormEvent) { event.preventDefault(); const parsed = subscriptionFormSchema.safeParse(sub); if (!parsed.success) return setMessage(parsed.error.issues[0]?.message ?? "Dados inválidos."); await run(() => financeService.saveSubscription(parsed.data), "Assinatura salva."); setSub(subBlank()); }
-  async function saveBudget(event: FormEvent) { event.preventDefault(); const parsed = budgetFormSchema.safeParse(budget); if (!parsed.success) return setMessage("Confira o orçamento."); await run(() => financeService.saveBudget(parsed.data), "Orçamento salvo."); }
-  async function remove(action: () => Promise<void>) { if (!confirm("Excluir este registro?")) return; await run(action, "Registro excluído."); }
+  const categoryMap = useMemo(
+    () => new Map(finance.snapshot.categories.map((item) => [item.id, item])),
+    [finance.snapshot.categories]
+  );
+  const monthRows = useMemo(
+    () => finance.snapshot.transactions.filter(
+      (item) => item.transaction_date >= monthStart(month)
+        && item.transaction_date <= monthEnd(month)
+    ),
+    [finance.snapshot.transactions, month]
+  );
+  const summary = finance.summaryForMonth(month);
+
+  useEffect(() => {
+    const theme = finance.snapshot.settings?.theme ?? "dark";
+    document.documentElement.dataset.theme = theme === "light" ? "light" : "dark";
+    document.documentElement.classList.toggle(
+      "compact",
+      finance.snapshot.settings?.compact_mode ?? false
+    );
+  }, [finance.snapshot.settings?.theme, finance.snapshot.settings?.compact_mode]);
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const auth = url.searchParams.get("auth");
+    if (auth === "confirmed") {
+      setTone("success");
+      setMessage("E-mail confirmado. Sua conta está pronta para entrar.");
+    } else if (auth === "email-change") {
+      setTone("success");
+      setMessage("Novo e-mail confirmado. O endereço da conta foi atualizado.");
+      setView("settings");
+    } else {
+      return;
+    }
+
+    url.searchParams.delete("auth");
+    window.history.replaceState({}, "", url);
+  }, []);
+
+  async function run(action: () => Promise<unknown>, ok: string): Promise<boolean> {
+    setBusy(true);
+    setMessage("");
+    try {
+      await action();
+      await finance.refresh(false);
+      setTone("success");
+      setMessage(ok);
+      return true;
+    } catch (caught) {
+      setTone("error");
+      setMessage(caught instanceof Error ? caught.message : "A operação falhou.");
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove(action: () => Promise<void>) {
+    if (!window.confirm("Excluir este registro? Esta ação não pode ser desfeita.")) return;
+    await run(action, "Registro excluído.");
+  }
+
+  if (finance.loading) {
+    return (
+      <main className="splash">
+        <div className="brand-mark">N</div>
+        <p>Preparando sua visão financeira…</p>
+      </main>
+    );
+  }
+
+  if (finance.recoveryMode) {
+    return (
+      <PasswordRecoveryScreen
+        onDone={() => {
+          finance.finishRecovery();
+          void finance.refresh(true);
+        }}
+      />
+    );
+  }
+
+  if (!finance.session) return <AuthScreen initialMessage={finance.error ?? ""} />;
+
+  const privacy = finance.snapshot.settings?.privacy_mode ?? false;
+  const money = (value: number) => privacy ? "R$ •••••" : formatCurrency(value);
 
   let content: React.ReactNode;
-  if (view === "dashboard") content = <><div className="hero"><div><p>Competência</p><h2>{monthLabel(month)}</h2></div><input type="month" value={month} onChange={e => setMonth(e.target.value)} /></div><div className="metrics"><Card title="Entradas"><strong className="good">{money(summary.income)}</strong></Card><Card title="Saídas"><strong className="bad">{money(summary.expense)}</strong></Card><Card title="Saldo"><strong>{money(summary.balance)}</strong></Card><Card title="Previsão líquida"><strong>{money(summary.plannedIncome - summary.plannedExpense)}</strong></Card></div><Card title="Últimos lançamentos">{monthRows.length ? <ul className="list">{monthRows.slice(0, 8).map(t => <li key={t.id}><div><b>{t.description}</b><small>{formatDate(t.transaction_date)} · {categoryMap.get(t.category_id ?? "")?.name ?? "Sem categoria"}</small></div><strong className={t.kind === "income" ? "good" : "bad"}>{t.kind === "income" ? "+" : "-"}{money(t.amount)}</strong></li>)}</ul> : <p className="empty">Nenhum lançamento neste mês.</p>}</Card></>;
-  else if (view === "transactions") content = <><Card title="Novo lançamento"><form className="grid" onSubmit={saveTx}><Field label="Descrição"><input value={tx.description} onChange={e => setTx({ ...tx, description: e.target.value })} required /></Field><Field label="Valor"><input type="number" min="0.01" step="0.01" value={tx.amount || ""} onChange={e => setTx({ ...tx, amount: e.target.valueAsNumber })} required /></Field><Field label="Tipo"><select value={tx.kind} onChange={e => setTx({ ...tx, kind: e.target.value as "income" | "expense", category_id: null })}><option value="expense">Saída</option><option value="income">Entrada</option></select></Field><Field label="Status"><select value={tx.status} onChange={e => setTx({ ...tx, status: e.target.value as "posted" | "planned" })}><option value="posted">Realizada</option><option value="planned">Prevista</option></select></Field><Field label="Data"><input type="date" value={tx.transaction_date} onChange={e => setTx({ ...tx, transaction_date: e.target.value })} /></Field><Field label="Categoria"><select value={tx.category_id ?? ""} onChange={e => setTx({ ...tx, category_id: e.target.value || null })}><option value="">Sem categoria</option>{categoriesFor(tx.kind).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field><Field label="Observação"><textarea value={tx.note ?? ""} onChange={e => setTx({ ...tx, note: e.target.value || null })} /></Field><button disabled={busy}><Plus size={16}/>Adicionar</button></form></Card><Card title="Lançamentos do mês"><div className="table"><table><thead><tr><th>Data</th><th>Descrição</th><th>Tipo</th><th>Valor</th><th></th></tr></thead><tbody>{monthRows.map(t => <tr key={t.id}><td>{formatDate(t.transaction_date)}</td><td>{t.description}</td><td>{t.status === "posted" ? "Realizada" : "Prevista"}</td><td className={t.kind === "income" ? "good" : "bad"}>{money(t.amount)}</td><td><button className="icon" onClick={() => remove(() => financeService.deleteTransaction(t.id))}><Trash2 size={16}/></button></td></tr>)}</tbody></table></div></Card></>;
-  else if (view === "automations") content = <div className="two"><Card title="Nova recorrência"><form className="grid" onSubmit={saveRec}><Field label="Descrição"><input value={rec.description} onChange={e => setRec({ ...rec, description: e.target.value })}/></Field><Field label="Valor"><input type="number" min="0.01" step="0.01" value={rec.amount || ""} onChange={e => setRec({ ...rec, amount: e.target.valueAsNumber })}/></Field><Field label="Tipo"><select value={rec.kind} onChange={e => setRec({ ...rec, kind: e.target.value as "income"|"expense" })}><option value="expense">Saída</option><option value="income">Entrada</option></select></Field><Field label="Frequência"><select value={rec.frequency} onChange={e => setRec({ ...rec, frequency: e.target.value as RecurrenceFormInput["frequency"] })}><option value="daily">Diária</option><option value="weekly">Semanal</option><option value="monthly">Mensal</option><option value="yearly">Anual</option></select></Field><Field label="Próxima data"><input type="date" value={rec.next_date} onChange={e => setRec({ ...rec, next_date: e.target.value, start_date: e.target.value })}/></Field><Field label="Dia-base"><input type="number" min="1" max="31" value={rec.anchor_day} onChange={e => setRec({ ...rec, anchor_day: e.target.valueAsNumber })}/></Field><button disabled={busy}>Salvar recorrência</button></form><ul className="list">{finance.snapshot.recurringRules.map(r => <li key={r.id}><div><b>{r.description}</b><small>Próxima: {formatDate(r.next_date)}</small></div><button className="icon" onClick={() => remove(() => financeService.deleteRecurrence(r.id))}><Trash2 size={16}/></button></li>)}</ul></Card><Card title="Nova assinatura"><form className="grid" onSubmit={saveSub}><Field label="Serviço"><input value={sub.name} onChange={e => setSub({ ...sub, name: e.target.value })}/></Field><Field label="Valor"><input type="number" min="0.01" step="0.01" value={sub.amount || ""} onChange={e => setSub({ ...sub, amount: e.target.valueAsNumber })}/></Field><Field label="Ciclo"><select value={sub.cycle} onChange={e => setSub({ ...sub, cycle: e.target.value as "monthly"|"yearly" })}><option value="monthly">Mensal</option><option value="yearly">Anual</option></select></Field><Field label="Próxima cobrança"><input type="date" value={sub.next_charge} onChange={e => setSub({ ...sub, next_charge: e.target.value, start_date: e.target.value })}/></Field><Field label="Dia"><input type="number" min="1" max="31" value={sub.billing_day} onChange={e => setSub({ ...sub, billing_day: e.target.valueAsNumber })}/></Field><button disabled={busy}>Salvar assinatura</button></form><ul className="list">{finance.snapshot.subscriptions.map(s => <li key={s.id}><div><b>{s.name}</b><small>{money(s.amount)} · {formatDate(s.next_charge)}</small></div><button className="icon" onClick={() => remove(() => financeService.deleteSubscription(s.id))}><Trash2 size={16}/></button></li>)}</ul></Card></div>;
-  else if (view === "budgets") content = <><Card title="Orçamento mensal"><form className="grid" onSubmit={saveBudget}><Field label="Categoria"><select value={budget.category_id} onChange={e => setBudget({ ...budget, category_id: e.target.value })}><option value="">Selecione</option>{categoriesFor("expense").map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field><Field label="Mês"><input type="month" value={budget.month.slice(0,7)} onChange={e => setBudget({ ...budget, month: `${e.target.value}-01` })}/></Field><Field label="Limite"><input type="number" min="0.01" step="0.01" value={budget.amount || ""} onChange={e => setBudget({ ...budget, amount: e.target.valueAsNumber })}/></Field><button disabled={busy}>Salvar orçamento</button></form></Card><div className="metrics">{finance.snapshot.budgets.filter(b => b.month.startsWith(month)).map(b => { const spent = monthRows.filter(t => t.kind === "expense" && t.status === "posted" && t.category_id === b.category_id).reduce((a,t)=>a+t.amount,0); return <Card key={b.id} title={categoryMap.get(b.category_id)?.name ?? "Categoria"}><strong>{money(spent)} / {money(b.amount)}</strong><progress max={b.amount} value={Math.min(spent,b.amount)}/><button className="danger" onClick={() => remove(() => financeService.deleteBudget(b.id))}>Excluir</button></Card>; })}</div></>;
-  else if (view === "reports") { const byCategory = Array.from(categoryMap.values()).map(c => ({ c, total: monthRows.filter(t => t.kind === "expense" && t.status === "posted" && t.category_id === c.id).reduce((a,t)=>a+t.amount,0) })).filter(x=>x.total>0).sort((a,b)=>b.total-a.total); content = <><div className="hero"><h2>{monthLabel(month)}</h2><input type="month" value={month} onChange={e => setMonth(e.target.value)}/></div><Card title="Despesas por categoria"><ul className="list">{byCategory.map(x=><li key={x.c.id}><b>{x.c.name}</b><strong>{money(x.total)}</strong></li>)}</ul></Card></>; }
-  else if (view === "settings") content = <SettingsPage categories={finance.snapshot.categories} onDone={() => finance.refresh(false)} />;
-  else content = <Card title="Ajuda e boas práticas"><div className="help"><p><b>Realizada</b> afeta o saldo. <b>Prevista</b> serve para planejamento.</p><p>Recorrências no dia 31 usam o último dia quando necessário e voltam ao dia 31 no mês seguinte.</p><p>Assinaturas ficam separadas para facilitar cancelamentos e próximos vencimentos.</p><p>Não reutilize senha, mantenha o navegador atualizado e encerre a sessão em computadores compartilhados.</p></div></Card>;
+  if (view === "dashboard") {
+    content = (
+      <DashboardView
+        month={month}
+        onMonth={setMonth}
+        summary={summary}
+        rows={monthRows}
+        subscriptions={finance.snapshot.subscriptions}
+        categoryMap={categoryMap}
+        money={money}
+        privacy={privacy}
+      />
+    );
+  } else if (view === "transactions") {
+    content = (
+      <TransactionsView
+        rows={monthRows}
+        categories={finance.snapshot.categories}
+        money={money}
+        busy={busy}
+        run={run}
+        remove={remove}
+      />
+    );
+  } else if (view === "automations") {
+    content = (
+      <AutomationsView
+        rules={finance.snapshot.recurringRules}
+        subscriptions={finance.snapshot.subscriptions}
+        categories={finance.snapshot.categories}
+        money={money}
+        busy={busy}
+        run={run}
+        remove={remove}
+      />
+    );
+  } else if (view === "budgets") {
+    content = (
+      <BudgetsView
+        month={month}
+        budgets={finance.snapshot.budgets}
+        categories={finance.snapshot.categories}
+        rows={monthRows}
+        money={money}
+        busy={busy}
+        run={run}
+        remove={remove}
+      />
+    );
+  } else if (view === "reports") {
+    content = (
+      <ReportsView
+        month={month}
+        onMonth={setMonth}
+        summary={summary}
+        rows={monthRows}
+        categories={finance.snapshot.categories}
+        money={money}
+      />
+    );
+  } else if (view === "settings") {
+    content = (
+      <SettingsView
+        profile={finance.snapshot.profile}
+        settings={finance.snapshot.settings}
+        categories={finance.snapshot.categories}
+        email={finance.session.user.email ?? "E-mail indisponível"}
+        busy={busy}
+        run={run}
+        remove={remove}
+      />
+    );
+  } else {
+    content = <HelpView />;
+  }
 
-  return <div className="shell"><aside><div className="logo"><span>N</span><b>Nummi</b></div><nav>{nav.map(([id,label,Icon]) => <button key={id} className={view===id?"active":""} onClick={()=>setView(id)}><Icon size={18}/>{label}</button>)}</nav><button onClick={() => authService.signOut()}><LogOut size={18}/>Sair</button></aside><main><header><div><p>Controle financeiro</p><h1>{nav.find(n=>n[0]===view)?.[1]}</h1></div><button className="refresh" onClick={() => finance.refresh(true)} disabled={finance.refreshing}><RefreshCw size={17}/>Atualizar</button></header>{(message || finance.error) && <div className="notice">{message || finance.error}</div>}{content}</main></div>;
-}
+  return (
+    <div className="shell">
+      <aside>
+        <div className="logo"><span>N</span><b>Nummi</b></div>
+        <nav aria-label="Navegação principal">
+          {nav.map(([id, label, Icon]) => (
+            <button
+              key={id}
+              className={view === id ? "active" : ""}
+              onClick={() => setView(id)}
+              aria-current={view === id ? "page" : undefined}
+            >
+              <Icon size={18} />
+              <span>{label}</span>
+            </button>
+          ))}
+        </nav>
+        <button
+          onClick={() => {
+            void authService.signOut("local").catch((caught) => {
+              setTone("error");
+              setMessage(caught instanceof Error ? caught.message : "Não foi possível sair.");
+            });
+          }}
+        >
+          <LogOut size={18} />
+          <span>Sair</span>
+        </button>
+      </aside>
 
-function SettingsPage({ categories, onDone }: { categories: Category[]; onDone: () => Promise<void> }) {
-  const [name,setName]=useState(""); const [scope,setScope]=useState<"income"|"expense"|"both">("both"); const [busy,setBusy]=useState(false);
-  async function add(event:FormEvent){event.preventDefault();setBusy(true);try{await financeService.saveCategory({name,scope,color:"#64748b",archived:false});setName("");await onDone();}finally{setBusy(false)}}
-  return <div className="two"><Card title="Categorias"><form className="grid" onSubmit={add}><Field label="Nome"><input value={name} onChange={e=>setName(e.target.value)} required/></Field><Field label="Uso"><select value={scope} onChange={e=>setScope(e.target.value as typeof scope)}><option value="both">Entradas e saídas</option><option value="income">Entradas</option><option value="expense">Saídas</option></select></Field><button disabled={busy}>Adicionar categoria</button></form><ul className="list">{categories.map(c=><li key={c.id}><b>{c.name}</b><small>{c.scope}</small></li>)}</ul></Card><Card title="Privacidade"><p>Os dados são isolados por usuário no banco com RLS. A chave pública do Supabase não concede acesso sem uma sessão válida.</p><p>Use o modo de privacidade do perfil por meio da API de ajustes.</p></Card></div>;
+      <main>
+        <header>
+          <div>
+            <p>Controle financeiro pessoal</p>
+            <h1>{nav.find((item) => item[0] === view)?.[1]}</h1>
+          </div>
+          <button
+            className="refresh"
+            onClick={() => finance.refresh(true)}
+            disabled={finance.refreshing}
+          >
+            <RefreshCw className={finance.refreshing ? "spin" : ""} size={17} />
+            Atualizar
+          </button>
+        </header>
+
+        {(message || finance.error) && (
+          <StatusMessage tone={finance.error ? "error" : tone}>
+            {message || finance.error}
+          </StatusMessage>
+        )}
+
+        <Suspense fallback={<div className="view-loading">Carregando tela…</div>}>
+          {content}
+        </Suspense>
+      </main>
+    </div>
+  );
 }
