@@ -1,0 +1,27 @@
+.fatal-error {
+  min-height: 100vh;
+  display: grid;
+  place-content: center;
+  gap: 1rem;
+  width: min(100% - 2rem, 640px);
+  margin-inline: auto;
+  text-align: center;
+}
+
+.fatal-error .brand-mark {
+  margin-inline: auto;
+}
+
+.fatal-error h1,
+.fatal-error p {
+  margin: 0;
+}
+
+.fatal-error p:not(.eyebrow) {
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.fatal-error .form-actions {
+  justify-content: center;
+}
