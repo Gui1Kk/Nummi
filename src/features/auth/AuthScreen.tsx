@@ -9,17 +9,23 @@ import { emailSchema } from "./validation";
 type Mode = "login" | "register" | "forgot" | "check-email";
 type Tone = "info" | "success" | "warning" | "error";
 
-export function AuthScreen() {
+export function AuthScreen({ initialMessage = "" }: { initialMessage?: string }) {
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
-  const [tone, setTone] = useState<Tone>("info");
+  const [message, setMessage] = useState(initialMessage);
+  const [tone, setTone] = useState<Tone>(initialMessage ? "error" : "info");
   const [needsConfirmation, setNeedsConfirmation] = useState(false);
   const [cooldown, setCooldown] = useState(0);
+
+  useEffect(() => {
+    if (!initialMessage) return;
+    setTone("error");
+    setMessage(initialMessage);
+  }, [initialMessage]);
 
   useEffect(() => {
     if (!cooldown) return;
