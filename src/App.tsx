@@ -209,7 +209,6 @@ export default function App() {
         email={finance.session.user.email ?? "E-mail indisponível"}
         busy={busy}
         run={run}
-        refresh={() => finance.refresh(false)}
         remove={remove}
       />
     );
