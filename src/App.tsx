@@ -36,7 +36,7 @@ export default function App(){
  else if(view==="transactions")content=<TransactionsView rows={finance.snapshot.transactions} categories={finance.snapshot.categories} money={money} busy={busy} run={run} remove={remove} locale={locale} timezone={timezone}/>;
  else if(view==="automations")content=<AutomationsView rules={finance.snapshot.recurringRules} subscriptions={finance.snapshot.subscriptions} categories={finance.snapshot.categories} money={money} busy={busy} run={run} remove={remove} locale={locale} timezone={timezone}/>;
  else if(view==="budgets")content=<BudgetsView month={finance.activeMonth} budgets={finance.snapshot.budgets} categories={finance.snapshot.categories} money={money} busy={busy} run={run} remove={remove}/>;
- else if(view==="reports")content=<ReportsView month={finance.activeMonth} onMonth={finance.setActiveMonth} summary={summary} rows={finance.snapshot.transactions} categories={finance.snapshot.categories} money={money}/>;
+ else if(view==="reports")content=<ReportsView month={finance.activeMonth} onMonth={finance.setActiveMonth} summary={summary} rows={finance.snapshot.transactions} categories={finance.snapshot.categories} money={money} locale={locale}/>;
  else if(view==="notifications")content=<NotificationsView notifications={finance.snapshot.notifications} locale={locale} busy={busy} run={run} remove={remove}/>;
  else if(view==="settings")content=<SettingsView profile={profile} settings={finance.snapshot.settings} categories={finance.snapshot.categories} email={finance.session.user.email??"E-mail indisponível"} busy={busy} run={run} remove={remove}/>;
  else content=<HelpView/>;
