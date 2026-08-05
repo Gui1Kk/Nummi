@@ -12,8 +12,8 @@
 ## Evidências atuais
 
 - [x] PR #6 mesclado e aplicação implantada na Vercel
-- [x] commit anterior a esta revalidação: `76a05e510c99bad27ff5823cd58fc591d5ae9686`
-- [x] Vercel verde executando `npm run check`
+- [x] checklist restaurado no commit `9f8ce2e28ab2fe3b01205bad492679c276cf111b`
+- [x] commit restaurado aprovado pelo gate `npm run check` da Vercel
 - [x] API `1.2.1`, Edge Function `api-v1` versão 5, ativa com `verify_jwt=true`
 - [~] Edge Functions temporárias `build-diagnostics` e `api-load-test` continuam existentes, porém exigem JWT e retornam somente `410 Gone`
 - [x] extensão temporária `http` não está instalada
@@ -24,6 +24,7 @@
 - [!] existem 0 perfis para os 3 usuários atuais; ajustes e categorias existem
 - [~] produção possui 13 migrations aplicadas, mas o repositório ainda não materializa integralmente o schema inicial
 - [~] não existem transações, recorrências, assinaturas ou orçamentos reais para validar comportamento em carga
+- [x] oito branches secundárias realinhadas ao checklist restaurado
 
 ## 1. Limpeza obrigatória antes do merge
 
@@ -249,10 +250,8 @@
 - [x] PR #6 mesclado por squash
 - [x] aplicação implantada na Vercel
 - [x] API v5 ativa e protegida por JWT
-- [x] gate da Vercel verde no commit anterior a esta atualização documental
-- [x] branches secundárias estavam alinhadas antes desta atualização do checklist
-- [ ] confirmar o deploy da Vercel deste commit de checklist restaurado
-- [ ] realinhar branches secundárias ao novo commit da `main`
+- [x] checklist restaurado aprovado pelo gate da Vercel
+- [x] branches secundárias realinhadas ao checklist restaurado
 - [ ] executar smoke autenticado pós-deploy quando Auth/redirects estiverem corrigidos
 - [!] concluir Site URL, redirects, SMTP, CAPTCHA e Leaked Password Protection
 - [!] validar cadastro, confirmação, login e recuperação no domínio oficial
