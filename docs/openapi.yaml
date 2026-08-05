@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: Nummi API
-  version: 1.2.1
-  description: API financeira pessoal. Toda rota exige um JWT Supabase e todas as linhas são isoladas por RLS.
+  version: 1.3.0
+  description: API financeira pessoal. Todas as rotas exigem JWT Supabase, isolamento por RLS e validação estrita.
 servers:
   - url: https://uqisolhdsvzjmdvohbki.supabase.co/functions/v1/api-v1/v1
 security:
@@ -10,22 +10,25 @@ security:
 paths:
   /health:
     get:
-      summary: Estado autenticado da API
+      summary: Consultar versão e disponibilidade autenticada
       responses:
         '200': { description: API ativa }
         '401': { $ref: '#/components/responses/Unauthorized' }
   /snapshot:
     get:
-      summary: Snapshot limitado para a interface
+      summary: Carregar snapshot limitado da competência
+      parameters:
+        - { $ref: '#/components/parameters/From' }
+        - { $ref: '#/components/parameters/To' }
       responses:
-        '200': { description: Dados financeiros do usuário }
+        '200': { description: Perfil, preferências, categorias, mês financeiro, automações, orçamentos e notificações }
         '401': { $ref: '#/components/responses/Unauthorized' }
   /profile:
     get:
-      summary: Consultar perfil
+      summary: Consultar perfil próprio
       responses: { '200': { description: Perfil } }
     patch:
-      summary: Alterar perfil
+      summary: Alterar campos editáveis do perfil
       requestBody:
         required: true
         content:
@@ -36,7 +39,7 @@ paths:
         '400': { $ref: '#/components/responses/ValidationError' }
   /settings:
     get:
-      summary: Consultar preferências
+      summary: Consultar preferências próprias
       responses: { '200': { description: Preferências } }
     patch:
       summary: Alterar preferências
@@ -45,18 +48,20 @@ paths:
         content:
           application/json:
             schema: { $ref: '#/components/schemas/SettingsPatch' }
-      responses: { '200': { description: Preferências atualizadas } }
+      responses:
+        '200': { description: Preferências atualizadas }
+        '400': { $ref: '#/components/responses/ValidationError' }
   /transactions:
     get:
-      summary: Listar lançamentos
+      summary: Listar lançamentos paginados
       parameters:
         - { $ref: '#/components/parameters/Limit' }
         - { $ref: '#/components/parameters/Offset' }
         - { in: query, name: kind, schema: { type: string, enum: [income, expense] } }
         - { in: query, name: status, schema: { type: string, enum: [planned, posted] } }
         - { in: query, name: category_id, schema: { type: string, format: uuid } }
-        - { in: query, name: from, schema: { type: string, format: date } }
-        - { in: query, name: to, schema: { type: string, format: date } }
+        - { $ref: '#/components/parameters/From' }
+        - { $ref: '#/components/parameters/To' }
       responses: { '200': { description: Página de lançamentos } }
     post:
       summary: Criar lançamento
@@ -74,12 +79,13 @@ paths:
   /transactions/{id}:
     parameters: [ { $ref: '#/components/parameters/Id' } ]
     get:
-      summary: Consultar lançamento
+      summary: Consultar lançamento próprio
       responses:
         '200': { description: Lançamento }
         '404': { $ref: '#/components/responses/NotFound' }
     patch:
       summary: Alterar lançamento
+      description: Em lançamentos gerados, altera somente a ocorrência; a regra de origem permanece ativa.
       requestBody:
         required: true
         content:
@@ -90,12 +96,14 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
     delete:
       summary: Excluir lançamento
+      description: Em lançamentos gerados, exclui somente a ocorrência.
       responses:
         '204': { description: Excluído }
         '404': { $ref: '#/components/responses/NotFound' }
   /categories:
     get:
       summary: Listar categorias
+      parameters: [ { $ref: '#/components/parameters/Limit' }, { $ref: '#/components/parameters/Offset' } ]
       responses: { '200': { description: Categorias } }
     post:
       summary: Criar categoria
@@ -111,12 +119,12 @@ paths:
       summary: Consultar categoria
       responses: { '200': { description: Categoria } }
     patch:
-      summary: Alterar categoria
+      summary: Alterar, arquivar ou restaurar categoria
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/CategoryInput' }
+            schema: { $ref: '#/components/schemas/CategoryPatch' }
       responses: { '200': { description: Atualizada } }
     delete:
       summary: Excluir categoria não utilizada
@@ -126,6 +134,7 @@ paths:
   /recurrences:
     get:
       summary: Listar recorrências
+      parameters: [ { $ref: '#/components/parameters/Limit' }, { $ref: '#/components/parameters/Offset' } ]
       responses: { '200': { description: Recorrências } }
     post:
       summary: Criar recorrência
@@ -141,7 +150,12 @@ paths:
       summary: Consultar recorrência
       responses: { '200': { description: Recorrência } }
     patch:
-      summary: Alterar ou pausar recorrência
+      summary: Alterar, pausar ou reativar recorrência
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecurrencePatch' }
       responses: { '200': { description: Atualizada } }
     delete:
       summary: Excluir recorrência
@@ -149,6 +163,7 @@ paths:
   /subscriptions:
     get:
       summary: Listar assinaturas
+      parameters: [ { $ref: '#/components/parameters/Limit' }, { $ref: '#/components/parameters/Offset' } ]
       responses: { '200': { description: Assinaturas } }
     post:
       summary: Criar assinatura
@@ -164,7 +179,12 @@ paths:
       summary: Consultar assinatura
       responses: { '200': { description: Assinatura } }
     patch:
-      summary: Alterar ou pausar assinatura
+      summary: Alterar, pausar ou reativar assinatura
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SubscriptionPatch' }
       responses: { '200': { description: Atualizada } }
     delete:
       summary: Excluir assinatura
@@ -172,6 +192,7 @@ paths:
   /budgets:
     get:
       summary: Listar orçamentos
+      parameters: [ { $ref: '#/components/parameters/Limit' }, { $ref: '#/components/parameters/Offset' } ]
       responses: { '200': { description: Orçamentos } }
     post:
       summary: Criar ou substituir orçamento mensal
@@ -181,48 +202,83 @@ paths:
           application/json:
             schema: { $ref: '#/components/schemas/BudgetInput' }
       responses: { '201': { description: Salvo } }
+  /budgets/status:
+    get:
+      summary: Calcular limite efetivo, rollover, gasto e restante
+      parameters:
+        - in: query
+          name: month
+          required: true
+          schema: { type: string, format: date, description: Primeiro dia do mês }
+      responses: { '200': { description: Status dos orçamentos do mês } }
   /budgets/{id}:
     parameters: [ { $ref: '#/components/parameters/Id' } ]
+    get:
+      summary: Consultar orçamento
+      responses: { '200': { description: Orçamento } }
     patch:
       summary: Alterar orçamento
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BudgetPatch' }
       responses: { '200': { description: Atualizado } }
     delete:
       summary: Excluir orçamento
       responses: { '204': { description: Excluído } }
+  /notifications:
+    get:
+      summary: Listar notificações
+      parameters:
+        - { $ref: '#/components/parameters/Limit' }
+        - { $ref: '#/components/parameters/Offset' }
+        - { in: query, name: unread, schema: { type: boolean } }
+      responses: { '200': { description: Notificações } }
+  /notifications/{id}:
+    parameters: [ { $ref: '#/components/parameters/Id' } ]
+    patch:
+      summary: Marcar notificação como lida ou não lida
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NotificationPatch' }
+      responses: { '200': { description: Notificação atualizada } }
+    delete:
+      summary: Excluir notificação
+      responses: { '204': { description: Excluída } }
   /summary:
     get:
-      summary: Resumo por intervalo
-      description: O intervalo máximo é de dez anos e o resultado não pode exceder 10.000 lançamentos.
+      summary: Resumo monetário por intervalo usando PostgreSQL numeric
       parameters:
-        - { in: query, name: from, schema: { type: string, format: date } }
-        - { in: query, name: to, schema: { type: string, format: date } }
-      responses:
-        '200': { description: Entradas, saídas, saldo e valores previstos }
-        '413': { $ref: '#/components/responses/ResultSetTooLarge' }
+        - { $ref: '#/components/parameters/From' }
+        - { $ref: '#/components/parameters/To' }
+      responses: { '200': { description: Entradas, saídas, saldo, previstos e quantidade } }
   /automations/post-due:
     post:
-      summary: Gerar ocorrências vencidas de forma idempotente
+      summary: Gerar ocorrências vencidas sob RLS
       requestBody:
         content:
           application/json:
-            schema:
-              type: object
-              additionalProperties: false
-              properties:
-                through: { type: string, format: date }
-                max_occurrences: { type: integer, minimum: 1, maximum: 500 }
-      responses: { '200': { description: Contadores da execução } }
+            schema: { $ref: '#/components/schemas/AutomationInput' }
+      responses: { '200': { description: Contadores da execução idempotente } }
   /export/transactions:
     get:
       summary: Exportar até 10.000 lançamentos
       parameters:
         - { in: query, name: format, required: true, schema: { type: string, enum: [json, csv] } }
-        - { in: query, name: from, schema: { type: string, format: date } }
-        - { in: query, name: to, schema: { type: string, format: date } }
-      responses: { '200': { description: Arquivo ou JSON } }
+        - { $ref: '#/components/parameters/From' }
+        - { $ref: '#/components/parameters/To' }
+      responses: { '200': { description: Arquivo CSV protegido contra fórmulas ou JSON } }
   /import/transactions:
     post:
       summary: Importar até 500 lançamentos idempotentes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ImportInput' }
       responses: { '200': { description: Quantidade aceita, inserida e duplicada } }
 components:
   securitySchemes:
@@ -231,47 +287,140 @@ components:
     Id: { in: path, name: id, required: true, schema: { type: string, format: uuid } }
     Limit: { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
     Offset: { in: query, name: offset, schema: { type: integer, minimum: 0, maximum: 10000, default: 0 } }
+    From: { in: query, name: from, schema: { type: string, format: date } }
+    To: { in: query, name: to, schema: { type: string, format: date } }
   schemas:
+    Money: { type: number, exclusiveMinimum: 0, maximum: 999999999999.99 }
+    NullableUuid: { type: [string, 'null'], format: uuid }
     TransactionInput:
       type: object
       additionalProperties: false
       required: [description, amount, kind, transaction_date]
       properties:
         description: { type: string, minLength: 1, maxLength: 160 }
-        amount: { type: number, exclusiveMinimum: 0, maximum: 999999999999.99 }
+        amount: { $ref: '#/components/schemas/Money' }
         kind: { type: string, enum: [income, expense] }
         status: { type: string, enum: [planned, posted], default: posted }
-        category_id: { type: [string, 'null'], format: uuid }
+        category_id: { $ref: '#/components/schemas/NullableUuid' }
         transaction_date: { type: string, format: date }
         note: { type: [string, 'null'], maxLength: 2000 }
         idempotency_key: { type: string, minLength: 8, maxLength: 128 }
     TransactionPatch:
-      type: object
-      additionalProperties: false
-      properties:
-        description: { type: string, minLength: 1, maxLength: 160 }
-        amount: { type: number, exclusiveMinimum: 0, maximum: 999999999999.99 }
-        kind: { type: string, enum: [income, expense] }
-        status: { type: string, enum: [planned, posted] }
-        category_id: { type: [string, 'null'], format: uuid }
-        transaction_date: { type: string, format: date }
-        note: { type: [string, 'null'], maxLength: 2000 }
+      allOf:
+        - { $ref: '#/components/schemas/TransactionInput' }
+      required: []
     CategoryInput:
       type: object
       additionalProperties: false
       required: [name]
       properties:
         name: { type: string, minLength: 1, maxLength: 60 }
-        scope: { type: string, enum: [income, expense, both] }
-        color: { type: string, pattern: '^#[0-9A-Fa-f]{6}$' }
-        archived: { type: boolean }
-    RecurrenceInput: { type: object, additionalProperties: false }
-    SubscriptionInput: { type: object, additionalProperties: false }
-    BudgetInput: { type: object, additionalProperties: false }
-    ProfilePatch: { type: object, additionalProperties: false }
-    SettingsPatch: { type: object, additionalProperties: false }
+        scope: { type: string, enum: [income, expense, both], default: both }
+        color: { type: string, pattern: '^#[0-9A-Fa-f]{6}$', default: '#22c55e' }
+        archived: { type: boolean, default: false }
+    CategoryPatch:
+      allOf: [ { $ref: '#/components/schemas/CategoryInput' } ]
+      required: []
+    RecurrenceInput:
+      type: object
+      additionalProperties: false
+      required: [description, amount, kind, frequency, anchor_day, start_date, next_date]
+      properties:
+        description: { type: string, minLength: 1, maxLength: 160 }
+        amount: { $ref: '#/components/schemas/Money' }
+        kind: { type: string, enum: [income, expense] }
+        category_id: { $ref: '#/components/schemas/NullableUuid' }
+        frequency: { type: string, enum: [daily, weekly, monthly, yearly] }
+        interval_count: { type: integer, minimum: 1, maximum: 365, default: 1 }
+        anchor_day: { type: integer, minimum: 1, maximum: 31 }
+        start_date: { type: string, format: date }
+        next_date: { type: string, format: date }
+        end_date: { type: [string, 'null'], format: date }
+        auto_post: { type: boolean, default: true }
+        active: { type: boolean, default: true }
+        note: { type: [string, 'null'], maxLength: 2000 }
+    RecurrencePatch:
+      allOf: [ { $ref: '#/components/schemas/RecurrenceInput' } ]
+      required: []
+    SubscriptionInput:
+      type: object
+      additionalProperties: false
+      required: [name, amount, billing_day, start_date, next_charge]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        amount: { $ref: '#/components/schemas/Money' }
+        category_id: { $ref: '#/components/schemas/NullableUuid' }
+        cycle: { type: string, enum: [monthly, yearly], default: monthly }
+        interval_count: { type: integer, minimum: 1, maximum: 120, default: 1 }
+        billing_day: { type: integer, minimum: 1, maximum: 31 }
+        start_date: { type: string, format: date }
+        next_charge: { type: string, format: date }
+        end_date: { type: [string, 'null'], format: date }
+        active: { type: boolean, default: true }
+        auto_post: { type: boolean, default: true }
+        reminder_days: { type: integer, minimum: 0, maximum: 60, default: 3 }
+        website: { type: [string, 'null'], format: uri, maxLength: 500 }
+        note: { type: [string, 'null'], maxLength: 2000 }
+    SubscriptionPatch:
+      allOf: [ { $ref: '#/components/schemas/SubscriptionInput' } ]
+      required: []
+    BudgetInput:
+      type: object
+      additionalProperties: false
+      required: [category_id, month, amount]
+      properties:
+        category_id: { type: string, format: uuid }
+        month: { type: string, format: date, description: Primeiro dia do mês }
+        amount: { $ref: '#/components/schemas/Money' }
+        rollover: { type: boolean, default: false }
+    BudgetPatch:
+      allOf: [ { $ref: '#/components/schemas/BudgetInput' } ]
+      required: []
+    ProfilePatch:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        display_name: { type: string, minLength: 2, maxLength: 80 }
+        currency: { type: string, pattern: '^[A-Z]{3}$' }
+        locale: { type: string, minLength: 2, maxLength: 20 }
+        timezone: { type: string, minLength: 1, maxLength: 64 }
+    SettingsPatch:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        theme: { type: string, enum: [system, light, dark] }
+        privacy_mode: { type: boolean }
+        compact_mode: { type: boolean }
+        week_starts_on: { type: integer, minimum: 0, maximum: 6 }
+        reminder_days: { type: integer, minimum: 0, maximum: 60 }
+    NotificationPatch:
+      type: object
+      additionalProperties: false
+      required: [read]
+      properties: { read: { type: boolean } }
+    AutomationInput:
+      type: object
+      additionalProperties: false
+      properties:
+        through: { type: string, format: date }
+        max_occurrences: { type: integer, minimum: 1, maximum: 500 }
+    ImportInput:
+      type: object
+      additionalProperties: false
+      required: [transactions]
+      properties:
+        transactions:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            allOf:
+              - { $ref: '#/components/schemas/TransactionInput' }
+              - type: object
+                required: [idempotency_key]
   responses:
     Unauthorized: { description: JWT ausente, inválido ou expirado }
     ValidationError: { description: Corpo, query ou parâmetros inválidos }
     NotFound: { description: Recurso inexistente ou não pertencente ao usuário }
-    ResultSetTooLarge: { description: Intervalo retorna mais de 10.000 lançamentos }
